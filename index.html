@@ -1,0 +1,610 @@
+import React, { useState, useEffect } from 'react';
+import { Copy, Heart, Calendar, User, Home, Activity, ClipboardList, Settings, Check, Users, Plus, Trash2, ArrowUp, ArrowDown, MapPin, MessageSquare, Stethoscope } from 'lucide-react';
+
+const App = () => {
+  const [formData, setFormData] = useState({
+    dateInfo: {
+      visitDate: '',
+      submitDate: '',
+      type: 'AA01家訪'
+    },
+    expectations: {
+      reason: '',
+      service: '居家',
+      contactPerson: '',
+      visitWith: '',
+      changeNote: '此次訪視服務不變',
+      newServices: [] 
+    },
+    status: {
+      identity: '一般',
+      handicap: '無',
+      handicapCategories: [],
+      handicapDegree: '輕度',
+      subsidy: '無',
+      foreignCare: false,
+      marital: '已婚',
+      maritalOther: '',
+      familyType: [], // 兄弟姊妹, 子女
+      siblingRank: '一',
+      siblingRankOther: '',
+      siblingOrder: '', 
+      sonCount: '0',
+      daughterCount: '0',
+      childrenOrder: '', 
+      cohabit: '',
+      mainCaregiver: '',
+      contactPerson: '',
+      familyMembers: [] // { id, title, name, year, marital, location, note }
+    },
+    environment: {
+      type: '自有透天厝',
+      thresholds: '無',
+      tools: '',
+      repairNeed: '暫無輔具及居家無障礙修繕需求'
+    },
+    medical: {
+      diseases: '',
+      followUp: '',
+      tubes: '',
+      wounds: '',
+      hospitalized: '',
+      rehab: ''
+    },
+    currentVisit: {
+      activity: '',
+      appearance: '',
+      consciousness: '意識清楚',
+      vision: '正常',
+      hearing: '正常',
+      memory: '尚可',
+      limbs: '',
+      emotion: '穩定',
+      sleep: '尚可'
+    },
+    adls: {
+      eating: '自理',
+      hygiene: '自理',
+      bathing: '自理',
+      dressing: '自理',
+      toilet: '自理',
+      transfer: '自理',
+      walking: '自理',
+      stairs: '自理',
+      fall: '無'
+    },
+    iadls: {
+      phone: '自理',
+      medication: '自理',
+      money: '自理',
+      cooking: '自理',
+      housework: '自理',
+      outing: '自理'
+    },
+    problems: {
+      bathing: '',
+      environment: '',
+      fall: '跌倒風險問題',
+      housework: '',
+      walking: ''
+    },
+    plan: {
+      cms: '',
+      ba07: { unit: '輪派', count: '', freq: '', total: '', note: '' },
+      professional: { ca07: false, cd02: false, interval: '114/04-115/03' },
+      transport: { unit: '', trips: '8' },
+      assistive: { item: '', note: '' },
+      respite: { interval: '114/01-115/03', remainGa: '32340/48510', remainSc: '87780/71610' },
+      other: ''
+    },
+    execution: {
+      decisionMaker: '',
+      gapReason: '無使用意願'
+    },
+    remark: {
+      aa12: '案妹同意，已由專員協助轉介',
+      medicine: '暫無需求，故無核定',
+      familyCenter: ''
+    },
+    caseManager: '楊欣宜',
+    phone: '04-7565035'
+  });
+
+  const [output, setOutput] = useState('');
+
+  const familyTitles = [
+    "案妻", "案夫", "案父", "案母", 
+    "案長兄", "案次兄", "案三兄", "案大弟", "案次弟", "案三弟",
+    "案大姐", "案次姐", "案三姐", "案大妹", "案次妹", "案三妹",
+    "案長子", "案次子", "案三子", "案長女", "案次女", "案三女", "其它"
+  ];
+
+  const generateOutput = () => {
+    const { dateInfo, expectations, status, environment, medical, currentVisit, adls, iadls, problems, plan, execution, remark } = formData;
+    
+    let text = `一、${dateInfo.type}日期：${dateInfo.visitDate}，計畫送審日期：${dateInfo.submitDate}\n\n`;
+    text += `二、照顧計畫內容：\n`;
+    text += `(一) 家屬期待：因為${expectations.reason}，期望持續使用${expectations.service}服務減輕照顧壓力。\n`;
+    text += `本此與${expectations.contactPerson}聯繫 / ${expectations.visitWith}共同訪視。\n`;
+    
+    let changeText = expectations.changeNote;
+    if (expectations.changeNote === '此次新增服務' && expectations.newServices.length > 0) {
+      changeText += expectations.newServices.join('、');
+    }
+    text += `*${changeText}。\n\n`;
+    
+    text += `(二) 個案目前狀況：\n`;
+    
+    let handicapText = status.handicap === '有' 
+      ? `領有身障手冊(${status.handicapCategories.join('、')}/${status.handicapDegree})` 
+      : '未領有身障手冊';
+    text += `1.個案為長照${status.identity}戶，${handicapText}。領有${status.subsidy}津貼。\n`;
+    
+    let currentNum = 2;
+    if (status.foreignCare) {
+      text += `${currentNum}.有外看照顧。\n`;
+      currentNum++;
+    }
+    
+    const maritalText = status.marital === '其他' ? status.maritalOther : status.marital;
+    
+    let familyDesc = '';
+    if (status.familyType.includes('兄弟姊妹')) {
+      const rank = status.siblingRank === '其他' ? status.siblingRankOther : status.siblingRank;
+      familyDesc += `兄弟姊妹排行第${rank}`;
+      if (status.siblingOrder) familyDesc += `，順序：${status.siblingOrder}`;
+      familyDesc += `、`;
+    }
+    if (status.familyType.includes('子女')) {
+      familyDesc += `育有${status.sonCount}子${status.daughterCount}女`;
+      if (status.childrenOrder) familyDesc += `(${status.childrenOrder})`;
+    }
+    if (!familyDesc) familyDesc = '尚未填寫家庭成員基礎資訊';
+
+    text += `${currentNum}.家庭狀況：個案${maritalText}，${familyDesc}，現與${status.cohabit || 'Ｏ'}同住。主要照顧者為${status.mainCaregiver || 'Ｏ'}，聯繫者為${status.contactPerson || 'Ｏ'}。家庭狀況如下：\n`;
+    
+    // 家庭背景詳細列表產出：◎稱謂(姓名/年次)：婚姻狀況、住[居住地]、[備註]
+    if (status.familyMembers.length > 0) {
+      status.familyMembers.forEach(m => {
+        text += `◎${m.title}(${m.name}/${m.year})：${m.marital}、住${m.location || 'Ｏ'}、${m.note}\n`;
+      });
+    }
+    text += `\n`;
+    
+    text += `3.居住環境及輔具：\n案家為${environment.type}，${environment.thresholds}處門檻，家中備有${environment.tools}，${environment.repairNeed}。\n\n`;
+    text += `4.個案疾病史：\n${medical.diseases}；${medical.followUp}；${medical.tubes}；${medical.wounds}；${medical.hospitalized}。\n${medical.rehab}\n\n`;
+    text += `5.個案訪視時在做${currentVisit.activity}；外觀${currentVisit.appearance}；${currentVisit.consciousness}，理解、表達能力${currentVisit.consciousness}；視力${currentVisit.vision}；聽力${currentVisit.hearing}；短期記憶力${currentVisit.memory}；四肢狀況${currentVisit.limbs}；情緒狀況${currentVisit.emotion}；睡眠${currentVisit.sleep}。\n\n`;
+    text += `6.ADLs：\n進食${adls.eating}；刷牙洗臉${adls.hygiene}；沐浴${adls.bathing}；穿脫衣物${adls.dressing}；大小便${adls.toilet}；移位起身${adls.transfer}；步行${adls.walking}；跌倒${adls.fall}；上下樓梯${adls.stairs}。\n\n`;
+    text += `7.IADLs：\n打電話${iadls.phone}；藥物${iadls.medication}；金錢計算${iadls.money}；備餐${iadls.cooking}；家務${iadls.housework}；外出${iadls.outing}。\n\n`;
+    
+    text += `三、個案問題：\n`;
+    if(problems.bathing) text += `◎洗澡問題：${problems.bathing}。\n`;
+    if(problems.environment) text += `◎居住環境障礙問題：${problems.environment}。\n`;
+    if(problems.fall) text += `◎${problems.fall}。\n`;
+    if(problems.housework) text += `◎處理家務問題：${problems.housework}。\n`;
+    if(problems.walking) text += `◎走路問題：${problems.walking}。\n\n`;
+    
+    text += `四、照顧計畫：個案評估結果CMS：${plan.cms}，核定如下：\n`;
+    if(plan.ba07.count) {
+      text += `◎居家服務 - 洗澡問題。服務單位：${plan.ba07.unit}。BA07[沐浴]：${plan.ba07.count}天*${plan.ba07.freq}週=${plan.ba07.total}單位/月 >> ${plan.ba07.note}\n`;
+    }
+    if(plan.professional.ca07 || plan.professional.cd02) {
+      text += `◎專業服務。服務單位：輪派/指定單位。\n`;
+      if(plan.professional.ca07) text += `CA07[IADLs復能、ADLs復能照護] *3組，核定區間${plan.professional.interval}\n`;
+      if(plan.professional.cd02) text += `CD02[居家護理指導與諮詢] *3組，核定區間${plan.professional.interval}\n`;
+    }
+    if(plan.transport.unit) {
+      text += `◎交通接送 - 購物或外出問題。服務單位：${plan.transport.unit}。DA01[交通接送]：230元*${plan.transport.trips}趟。\n`;
+    }
+    if(plan.assistive.item) {
+      text += `◎輔具及無障礙改善。${plan.assistive.item}。${plan.assistive.note}\n`;
+    }
+    text += `◎喘息服務 - 照顧負荷過重。區間${plan.respite.interval}。\nGA09[居家喘息服務]*42單位，剩餘${plan.respite.remainGa}元；\nSC09[居家短照服務]*114/93單位，剩餘${plan.respite.remainSc}元。\n`;
+    
+    text += `\n＊此次與初訪評估相較，個案整體照護問題因長照服務介入，整體環境及日常生活功能獲得改善，身體狀況穩定無住院，對服務適應，照顧計畫適切，無需異動。\n`;
+    text += `※A個管員：${formData.caseManager}　※連絡電話：${formData.phone}\n\n`;
+    text += `五、執行規劃：與決策者${execution.decisionMaker}討論服務項目如上列核定↑\n`;
+    text += `照顧問題清單與服務對象實際使用項目之落差原因：\n◎居住環境障礙問題：${execution.gapReason}。\n\n`;
+    text += `六、其他備註\n`;
+    text += `◎AA12：${remark.aa12}。\n`;
+    text += `◎送藥：${remark.medicine}。\n`;
+    if(remark.familyCenter) text += `◎家總：${remark.familyCenter}\n`;
+    setOutput(text);
+  };
+
+  useEffect(() => {
+    generateOutput();
+  }, [formData]);
+
+  const handleInputChange = (section, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value
+      }
+    }));
+  };
+
+  const toggleMultiSelect = (section, field, value) => {
+    setFormData(prev => {
+      const current = prev[section][field];
+      const next = current.includes(value) 
+        ? current.filter(item => item !== value)
+        : [...current, value];
+      return { ...prev, [section]: { ...prev[section], [field]: next } };
+    });
+  };
+
+  const addFamilyMember = () => {
+    const newMember = { 
+      id: Date.now(), title: '案長子', name: '', year: '', marital: '已婚', location: '', note: '' 
+    };
+    setFormData(prev => ({
+      ...prev,
+      status: {
+        ...prev.status,
+        familyMembers: [...prev.status.familyMembers, newMember]
+      }
+    }));
+  };
+
+  const updateFamilyMember = (id, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      status: {
+        ...prev.status,
+        familyMembers: prev.status.familyMembers.map(m => m.id === id ? { ...m, [field]: value } : m)
+      }
+    }));
+  };
+
+  const removeFamilyMember = (id) => {
+    setFormData(prev => ({
+      ...prev,
+      status: {
+        ...prev.status,
+        familyMembers: prev.status.familyMembers.filter(m => m.id !== id)
+      }
+    }));
+  };
+
+  const moveMember = (index, direction) => {
+    const newMembers = [...formData.status.familyMembers];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= newMembers.length) return;
+    [newMembers[index], newMembers[targetIndex]] = [newMembers[targetIndex], newMembers[index]];
+    setFormData(prev => ({
+      ...prev,
+      status: {
+        ...prev.status,
+        familyMembers: newMembers
+      }
+    }));
+  };
+
+  const copyToClipboard = () => {
+    const textarea = document.createElement('textarea');
+    textarea.value = output;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    alert('計畫內容已成功複製！');
+  };
+
+  const InputGroup = ({ label, icon: Icon, colorClass, children }) => (
+    <div className="mb-6 bg-white/80 backdrop-blur-sm p-5 rounded-3xl shadow-sm border border-white/50 transition-all hover:shadow-md">
+      <h3 className={`text-sm font-bold ${colorClass} mb-4 flex items-center gap-2`}>
+        <div className={`p-1.5 rounded-full ${colorClass.replace('text-', 'bg-')}/10`}>
+          <Icon size={16} />
+        </div>
+        {label}
+      </h3>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col md:flex-row h-screen bg-[#FFFBEB] text-gray-700 font-sans overflow-hidden">
+      {/* Sidebar Form */}
+      <div className="w-full md:w-1/2 overflow-y-auto p-6 scrollbar-hide">
+        <header className="mb-8 px-2 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="bg-orange-400 p-2.5 rounded-2xl shadow-lg shadow-orange-200">
+              <Heart className="text-white" size={24} fill="white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-gray-800 tracking-tight">長照計畫生成器</h1>
+              <p className="text-xs text-orange-500/80 font-medium">智慧化個案管理輔助工具</p>
+            </div>
+          </div>
+        </header>
+
+        <InputGroup label="基本時程資訊" icon={Calendar} colorClass="text-orange-500">
+          <div className="grid grid-cols-2 gap-3">
+            <select 
+              className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none cursor-pointer"
+              value={formData.dateInfo.type}
+              onChange={(e) => handleInputChange('dateInfo', 'type', e.target.value)}
+            >
+              <option>AA01家訪</option>
+              <option>複評</option>
+              <option>出備初評</option>
+              <option>出備家訪</option>
+            </select>
+            <input 
+              type="date" 
+              className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none"
+              value={formData.dateInfo.visitDate}
+              onChange={(e) => handleInputChange('dateInfo', 'visitDate', e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-3 bg-white/50 p-3 rounded-2xl">
+            <span className="text-xs font-bold text-gray-400 whitespace-nowrap px-1">送審日期</span>
+            <input 
+              type="date" 
+              className="border-none bg-white p-2 rounded-xl text-sm w-full shadow-inner outline-none"
+              value={formData.dateInfo.submitDate}
+              onChange={(e) => handleInputChange('dateInfo', 'submitDate', e.target.value)}
+            />
+          </div>
+        </InputGroup>
+
+        <InputGroup label="家屬期待與異動" icon={User} colorClass="text-blue-500">
+          <input 
+            placeholder="期待原因 (例如：中風肢體無力)" 
+            className="w-full border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none"
+            value={formData.expectations.reason}
+            onChange={(e) => handleInputChange('expectations', 'reason', e.target.value)}
+          />
+          <div className="flex gap-3">
+            <input placeholder="本次聯繫人" className="border-none bg-white p-3 rounded-2xl text-sm w-1/2 shadow-inner outline-none" value={formData.expectations.contactPerson} onChange={(e) => handleInputChange('expectations', 'contactPerson', e.target.value)} />
+            <input placeholder="共同訪視者" className="border-none bg-white p-3 rounded-2xl text-sm w-1/2 shadow-inner outline-none" value={formData.expectations.visitWith} onChange={(e) => handleInputChange('expectations', 'visitWith', e.target.value)} />
+          </div>
+          <select 
+            className="w-full border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none cursor-pointer"
+            value={formData.expectations.changeNote}
+            onChange={(e) => handleInputChange('expectations', 'changeNote', e.target.value)}
+          >
+            <option>此次訪視服務不變</option>
+            <option>此次新增服務</option>
+          </select>
+          {formData.expectations.changeNote === '此次新增服務' && (
+            <div className="bg-blue-50/50 p-4 rounded-2xl flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-1">
+              {['居家服務', '交通車', '輔具無障礙', '喘息服務'].map(svc => (
+                <button
+                  key={svc}
+                  onClick={() => toggleMultiSelect('expectations', 'newServices', svc)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${formData.expectations.newServices.includes(svc) ? 'bg-blue-500 text-white shadow-md shadow-blue-200' : 'bg-white text-blue-400'}`}
+                >
+                  {svc}
+                </button>
+              ))}
+            </div>
+          )}
+        </InputGroup>
+
+        <InputGroup label="個案目前狀況" icon={ClipboardList} colorClass="text-purple-500">
+          <div className="grid grid-cols-2 gap-3">
+            <select className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none" value={formData.status.identity} onChange={(e) => handleInputChange('status', 'identity', e.target.value)}>
+              <option>一般</option>
+              <option>中低</option>
+              <option>低收</option>
+            </select>
+            <select className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none" value={formData.status.handicap} onChange={(e) => handleInputChange('status', 'handicap', e.target.value)}>
+              <option value="無">未領身障手冊</option>
+              <option value="有">領有身障手冊</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-3 text-sm text-gray-500 bg-white/40 p-3 rounded-2xl cursor-pointer hover:bg-white/60 transition-colors">
+            <input type="checkbox" className="w-4 h-4 rounded-full accent-purple-500 shadow-inner" checked={formData.status.foreignCare} onChange={(e) => handleInputChange('status', 'foreignCare', e.target.checked)} />
+            有外看照顧
+          </label>
+          <div className="bg-white/50 p-4 rounded-3xl space-y-4 shadow-inner">
+             <div>
+                <p className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-widest">婚姻與排行</p>
+                <div className="flex gap-2 mb-3">
+                  <select className="flex-1 border-none bg-white p-2 rounded-xl text-sm shadow-md outline-none" value={formData.status.marital} onChange={(e) => handleInputChange('status', 'marital', e.target.value)}>
+                    <option>未婚</option>
+                    <option>已婚</option>
+                    <option>喪偶</option>
+                    <option>其他</option>
+                  </select>
+                  {formData.status.marital === '其他' && (
+                    <input placeholder="填寫婚姻狀況" className="flex-1 border-none bg-white p-2 rounded-xl text-sm shadow-md outline-none" value={formData.status.maritalOther} onChange={(e) => handleInputChange('status', 'maritalOther', e.target.value)} />
+                  )}
+                </div>
+                <div className="flex gap-4 mb-3">
+                  {['兄弟姊妹', '子女'].map(type => (
+                    <label key={type} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="accent-purple-500" checked={formData.status.familyType.includes(type)} onChange={() => toggleMultiSelect('status', 'familyType', type)} />
+                      {type}
+                    </label>
+                  ))}
+                </div>
+                {formData.status.familyType.includes('兄弟姊妹') && (
+                  <div className="bg-white/60 p-3 rounded-2xl mb-3 animate-in slide-in-from-left-2">
+                    <p className="text-[10px] text-gray-400 font-bold mb-2 uppercase tracking-widest">兄弟姊妹排行與順序</p>
+                    <div className="flex gap-2 mb-2">
+                      <div className="flex-1 flex items-center bg-white p-2 rounded-xl shadow-sm gap-1">
+                        <span className="text-[10px] text-gray-400 font-bold px-1">排行第</span>
+                        <select className="w-full bg-transparent outline-none text-xs font-bold" value={formData.status.siblingRank} onChange={(e) => handleInputChange('status', 'siblingRank', e.target.value)}>
+                          {['一','二','三','四','五','其他'].map(n => <option key={n}>{n}</option>)}
+                        </select>
+                      </div>
+                      {formData.status.siblingRank === '其他' && (
+                        <input placeholder="排行..." className="flex-1 border-none bg-white p-2 rounded-xl text-xs shadow-sm outline-none" value={formData.status.siblingRankOther} onChange={(e) => handleInputChange('status', 'siblingRankOther', e.target.value)} />
+                      )}
+                    </div>
+                    <input 
+                      placeholder="兄弟姊妹順序 (例如：男女男)" 
+                      className="w-full border-none bg-white p-2 rounded-xl text-xs shadow-sm outline-none"
+                      value={formData.status.siblingOrder}
+                      onChange={(e) => handleInputChange('status', 'siblingOrder', e.target.value)}
+                    />
+                  </div>
+                )}
+                {formData.status.familyType.includes('子女') && (
+                  <div className="bg-white/60 p-3 rounded-2xl animate-in slide-in-from-left-2">
+                    <p className="text-[10px] text-gray-400 font-bold mb-2 uppercase tracking-widest">子女數量與順序</p>
+                    <div className="flex gap-2 mb-2">
+                      <div className="flex-1 flex items-center gap-1 bg-white p-2 rounded-xl shadow-sm">
+                        <span className="text-xs text-gray-400 font-bold">子</span>
+                        <select className="w-full bg-transparent outline-none text-xs font-bold" value={formData.status.sonCount} onChange={(e) => handleInputChange('status', 'sonCount', e.target.value)}>
+                          {['0','1','2','3','4','5','其他'].map(n => <option key={n}>{n}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 flex items-center gap-1 bg-white p-2 rounded-xl shadow-sm">
+                        <span className="text-xs text-gray-400 font-bold">女</span>
+                        <select className="w-full bg-transparent outline-none text-xs font-bold" value={formData.status.daughterCount} onChange={(e) => handleInputChange('status', 'daughterCount', e.target.value)}>
+                          {['0','1','2','3','4','5','其他'].map(n => <option key={n}>{n}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <input 
+                      placeholder="子女順序 (例如：男男男女女)" 
+                      className="w-full border-none bg-white p-2 rounded-xl text-xs shadow-sm outline-none"
+                      value={formData.status.childrenOrder}
+                      onChange={(e) => handleInputChange('status', 'childrenOrder', e.target.value)}
+                    />
+                  </div>
+                )}
+             </div>
+             <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center gap-2 bg-white/60 p-2 rounded-2xl">
+                   <span className="text-xs font-bold text-gray-400 whitespace-nowrap">現與</span>
+                   <input placeholder="誰" className="w-full border-none bg-white p-2 rounded-xl text-sm shadow-sm outline-none" value={formData.status.cohabit} onChange={(e) => handleInputChange('status', 'cohabit', e.target.value)} />
+                   <span className="text-xs font-bold text-gray-400 whitespace-nowrap">同住</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                   <input placeholder="主要照顧者 (如：長子)" className="w-full border-none bg-white p-3 rounded-2xl text-sm shadow-sm outline-none" value={formData.status.mainCaregiver} onChange={(e) => handleInputChange('status', 'mainCaregiver', e.target.value)} />
+                   <input placeholder="聯繫者 (如：次女)" className="w-full border-none bg-white p-3 rounded-2xl text-sm shadow-sm outline-none" value={formData.status.contactPerson} onChange={(e) => handleInputChange('status', 'contactPerson', e.target.value)} />
+                </div>
+             </div>
+          </div>
+
+          {/* 家庭背景詳細列表 (表格) */}
+          <div className="mt-4 pt-4 border-t border-purple-100">
+             <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-purple-100 rounded-lg"><Users size={14} className="text-purple-600"/></div>
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">家庭詳細背景補充表</h4>
+                </div>
+                <button onClick={addFamilyMember} className="bg-purple-500 hover:bg-purple-600 text-white p-1.5 rounded-full shadow-lg shadow-purple-100 transition-all active:scale-90">
+                   <Plus size={18}/>
+                </button>
+             </div>
+             <div className="space-y-4">
+                {formData.status.familyMembers.map((member, idx) => (
+                   <div key={member.id} className="bg-white p-4 rounded-3xl border border-purple-100 shadow-sm space-y-3 group animate-in zoom-in-95 duration-200">
+                      <div className="flex justify-between items-center">
+                         <div className="flex gap-1.5 items-center">
+                            <div className="flex flex-col">
+                               <button onClick={() => moveMember(idx, -1)} className="text-gray-300 hover:text-purple-500 transition-colors"><ArrowUp size={14}/></button>
+                               <button onClick={() => moveMember(idx, 1)} className="text-gray-300 hover:text-purple-500 transition-colors"><ArrowDown size={14}/></button>
+                            </div>
+                            <select className="bg-gray-50 p-2 rounded-xl text-xs font-bold outline-none border-none shadow-inner" value={member.title} onChange={(e) => updateFamilyMember(member.id, 'title', e.target.value)}>
+                               {familyTitles.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                            {member.title === "其它" && (
+                              <input placeholder="自填..." className="bg-gray-50 p-2 rounded-xl text-xs outline-none w-20 shadow-inner" onChange={(e) => updateFamilyMember(member.id, 'title', e.target.value)} />
+                            )}
+                         </div>
+                         <button onClick={() => removeFamilyMember(member.id)} className="text-red-200 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-all">
+                            <Trash2 size={16}/>
+                          </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                         <input placeholder="姓名" className="bg-gray-50 p-2.5 rounded-xl text-xs outline-none" value={member.name} onChange={(e) => updateFamilyMember(member.id, 'name', e.target.value)} />
+                         <input placeholder="年次" className="bg-gray-50 p-2.5 rounded-xl text-xs outline-none" value={member.year} onChange={(e) => updateFamilyMember(member.id, 'year', e.target.value)} />
+                         <select className="bg-gray-50 p-2.5 rounded-xl text-xs outline-none" value={member.marital} onChange={(e) => updateFamilyMember(member.id, 'marital', e.target.value)}>
+                            <option>已婚</option>
+                            <option>未婚</option>
+                            <option>喪偶</option>
+                            <option>離婚</option>
+                         </select>
+                         <div className="relative flex items-center">
+                            <MapPin size={10} className="absolute left-2.5 text-gray-300"/>
+                            <input placeholder="居住地" className="w-full bg-gray-50 p-2.5 pl-7 rounded-xl text-xs outline-none" value={member.location} onChange={(e) => updateFamilyMember(member.id, 'location', e.target.value)} />
+                         </div>
+                      </div>
+                      <div className="relative flex items-center">
+                         <MessageSquare size={10} className="absolute left-2.5 text-gray-300"/>
+                         <input placeholder="備註 (如：不定期返家探視)" className="w-full bg-gray-50 p-2.5 pl-7 rounded-xl text-xs outline-none" value={member.note} onChange={(e) => updateFamilyMember(member.id, 'note', e.target.value)} />
+                      </div>
+                   </div>
+                ))}
+             </div>
+          </div>
+        </InputGroup>
+
+        <InputGroup label="居住環境與輔具" icon={Home} colorClass="text-green-500">
+          <div className="grid grid-cols-2 gap-3">
+            <input placeholder="居住類型 (如：自有透天)" className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none" value={formData.environment.type} onChange={(e) => handleInputChange('environment', 'type', e.target.value)} />
+            <input placeholder="門檻情況" className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none" value={formData.environment.thresholds} onChange={(e) => handleInputChange('environment', 'thresholds', e.target.value)} />
+          </div>
+          <input placeholder="目前備有輔具" className="w-full border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none" value={formData.environment.tools} onChange={(e) => handleInputChange('environment', 'tools', e.target.value)} />
+          <textarea placeholder="修繕或輔具需求說明..." className="w-full border-none bg-white p-3 rounded-2xl text-sm h-16 shadow-inner outline-none resize-none" value={formData.environment.repairNeed} onChange={(e) => handleInputChange('environment', 'repairNeed', e.target.value)} />
+        </InputGroup>
+
+        <InputGroup label="個案疾病史紀錄" icon={Stethoscope} colorClass="text-emerald-600">
+          <textarea placeholder="主要疾病名稱..." className="w-full border-none bg-white p-3 rounded-2xl text-sm h-16 shadow-inner outline-none resize-none" value={formData.medical.diseases} onChange={(e) => handleInputChange('medical', 'diseases', e.target.value)} />
+          <div className="grid grid-cols-2 gap-3">
+             <input placeholder="追蹤情形" className="border-none bg-white p-2 rounded-xl text-xs shadow-inner outline-none" value={formData.medical.followUp} onChange={(e) => handleInputChange('medical', 'followUp', e.target.value)} />
+             <input placeholder="管路狀況" className="border-none bg-white p-2 rounded-xl text-xs shadow-inner outline-none" value={formData.medical.tubes} onChange={(e) => handleInputChange('medical', 'tubes', e.target.value)} />
+          </div>
+          <input placeholder="傷口狀況" className="w-full border-none bg-white p-2 rounded-xl text-xs shadow-inner outline-none" value={formData.medical.wounds} onChange={(e) => handleInputChange('medical', 'wounds', e.target.value)} />
+          <input placeholder="住院紀錄" className="w-full border-none bg-white p-2 rounded-xl text-xs shadow-inner outline-none" value={formData.medical.hospitalized} onChange={(e) => handleInputChange('medical', 'hospitalized', e.target.value)} />
+          <textarea placeholder="復健/運動情形..." className="w-full border-none bg-white p-2 rounded-xl text-xs h-16 shadow-inner outline-none resize-none" value={formData.medical.rehab} onChange={(e) => handleInputChange('medical', 'rehab', e.target.value)} />
+        </InputGroup>
+
+        <InputGroup label="ADLs/IADLs 評估指標" icon={Activity} colorClass="text-red-400">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            {Object.keys(formData.adls).map((key) => (
+              <div key={key} className="bg-white/40 p-2 rounded-2xl">
+                <span className="text-[10px] text-gray-400 font-bold ml-2 mb-1 block uppercase tracking-wider">{key === 'fall' ? '跌倒風險' : key}</span>
+                <select className="w-full border-none bg-white p-2 rounded-xl text-xs shadow-inner outline-none cursor-pointer" value={formData.adls[key]} onChange={(e) => handleInputChange('adls', key, e.target.value)}>
+                  <option>自理</option>
+                  <option>部分協助</option>
+                  <option>完全協助</option>
+                  {key === 'fall' && <option>有</option>}
+                  {key === 'fall' && <option>無</option>}
+                </select>
+              </div>
+            ))}
+          </div>
+        </InputGroup>
+
+        <div className="bg-white/70 p-5 rounded-3xl mb-10 border border-white/50">
+          <h3 className="text-sm font-bold text-gray-400 mb-4 flex items-center gap-2">個案管理員資訊</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <input className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none" value={formData.caseManager} onChange={(e) => handleInputChange('caseManager', e.target.value)} />
+            <input className="border-none bg-white p-3 rounded-2xl text-sm shadow-inner outline-none" value={formData.phone} onChange={(e) => handleInputChange('phone', e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Preview Section */}
+      <div className="w-full md:w-1/2 flex flex-col bg-white/40 backdrop-blur-md relative border-l border-white/20">
+        <div className="p-6 border-b border-white/20 flex justify-between items-center bg-white/20">
+          <div>
+            <span className="text-xs font-black text-orange-500 uppercase tracking-widest block">Output Preview</span>
+            <span className="text-sm text-gray-600 font-medium">生成的長期照顧計畫文字</span>
+          </div>
+          <button onClick={copyToClipboard} className="flex items-center gap-2 bg-orange-400 hover:bg-orange-500 text-white px-6 py-3 rounded-full text-sm font-bold transition-all shadow-lg shadow-orange-200 active:scale-95 group">
+            <Copy size={18} className="group-hover:rotate-12 transition-transform" />
+            複製全文內容
+          </button>
+        </div>
+        <div className="flex-1 p-8 overflow-y-auto bg-gradient-to-b from-white/10 to-transparent">
+          <div className="max-w-prose mx-auto bg-white/90 shadow-2xl shadow-orange-100/50 p-10 rounded-[2.5rem] min-h-full text-[14px] leading-relaxed whitespace-pre-wrap font-mono text-gray-700 selection:bg-orange-100">
+            {output}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
